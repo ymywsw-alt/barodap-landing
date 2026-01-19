@@ -1,211 +1,106 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>바로답</title>
 </head>
 
-<body style="font-family: system-ui; max-width: 720px; margin: 56px auto; padding: 0 16px; line-height: 1.5;">
-  <h1 style="margin:0 0 8px 0;">바로답</h1>
-  <p style="margin:0 0 20px 0; opacity:0.8;">이해 안 되는 걸 보내면, 지금 할 한 가지를 바로 알려줍니다.</p>
+<body style="font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; max-width:720px; margin:0 auto; padding:16px;">
 
-  <label for="q" style="display:block; font-weight:600; margin: 16px 0 8px;">문장을 그대로 붙여넣으세요</label>
-  <textarea id="q" rows="5"
-    placeholder="예) ‘납부 기한이 경과되었습니다’ 이게 무슨 뜻이지?"
-    style="width:100%; padding:12px; border:1px solid #ddd; border-radius:10px; font-size:16px;"></textarea>
+  <h1>바로답</h1>
+  <p>이해 안 되는 걸 보내면, 지금 할 한 가지를 바로 알려줍니다.</p>
 
-  <!-- 사진/캡처 업로드(버튼 1개로 통합) -->
-  <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
-  <input
-    id="img"
-    type="file"
-    accept="image/*"
-    capture="environment"
-    style="display:none"
-  />
+  <!-- 텍스트 입력 -->
+  <label style="font-weight:700;">문장을 그대로 붙여넣으세요</label>
+  <textarea
+    id="text"
+    rows="6"
+    placeholder="예) ‘납부 기한이 경과되었습니다’ 이게 무슨 뜻이죠?"
+    style="width:100%; margin-top:8px; padding:12px; font-size:16px; border-radius:12px; border:1px solid #ddd;"
+  ></textarea>
 
-  <button
-    id="photo"
-    onclick="document.getElementById('img').click()"
-    style="flex:1; padding:12px; border:1px solid #ddd; border-radius:12px; font-size:16px; font-weight:700; cursor:pointer;">
-    사진으로 바로답
-  </button>
-</div>
-
-  <!-- 결과 (3줄 고정) -->
-  <div id="out"
-    style="margin-top:18px; padding:14px; border:1px solid #eee; border-radius:12px; display:none;">
-    <div id="l1" style="font-weight:700; margin-bottom:6px;"></div>
-    <div id="l2" style="margin-bottom:6px;"></div>
-    <div id="l3"></div>
+  <!-- 사진 입력 버튼 -->
+  <div style="margin-top:12px; display:flex; gap:10px;">
+    <input
+      id="img"
+      type="file"
+      accept="image/*"
+      capture="environment"
+      style="display:none"
+    />
+    <button
+      id="photo"
+      onclick="document.getElementById('img').click()"
+      style="flex:1; padding:12px; border:1px solid #ddd; border-radius:12px; font-size:16px; font-weight:700;">
+      사진으로 바로답
+    </button>
   </div>
 
-  <div id="status" style="margin-top:10px; font-size:14px; opacity:0.8;"></div>
+  <!-- 메인 실행 버튼 -->
+  <button
+    id="go"
+    style="margin-top:12px; width:100%; padding:12px; border:0; border-radius:12px; font-size:16px; font-weight:700; background:#000; color:#fff;">
+    바로답
+  </button>
 
-  <script>
-    let mode = "ask"; // ask=바로답, reset=새 문장 넣기
+  <!-- 결과 영역 -->
+  <div
+    id="result"
+    style="margin-top:16px; padding:14px; border-radius:12px; border:1px solid #eee; display:none;"
+  ></div>
 
-    function setStatus(msg) {
-      document.getElementById("status").textContent = msg || "";
+<script>
+  const textEl = document.getElementById('text');
+  const imgEl = document.getElementById('img');
+  const goBtn = document.getElementById('go');
+  const resultEl = document.getElementById('result');
+
+  let hasResult = false;
+
+  // 메인 버튼 동작
+  goBtn.onclick = async () => {
+    if (hasResult) {
+      // 새 문장 넣기
+      textEl.value = "";
+      imgEl.value = "";
+      resultEl.style.display = "none";
+      goBtn.textContent = "바로답";
+      hasResult = false;
+      return;
     }
 
-    function basicFallback() {
-      return [
-        "정의: 의미가 확실하지 않은 문장입니다.",
-        "중요도: 섣불리 판단하면 손해/리스크가 생길 수 있습니다.",
-        "행동: 발신처(기관/회사) 이름과 ‘무엇을 요구하는지’만 확인해 다시 붙여넣으세요."
-      ];
+    const text = textEl.value.trim();
+    if (!text) {
+      alert("문장을 붙여넣거나 사진을 선택하세요.");
+      return;
     }
 
-    function classifyAndAnswer(text) {
-      const t = (text || "").trim();
-      if (!t) {
-        return [
-          "정의: 입력이 비어 있습니다.",
-          "중요도: 판단할 정보가 없습니다.",
-          "행동: 이해 안 되는 문장을 그대로 1~2줄 붙여넣으세요."
-        ];
-      }
+    resultEl.style.display = "block";
+    resultEl.innerHTML = "처리 중입니다…";
 
-      const lower = t.toLowerCase();
+    // TODO: 실제 API 호출 연결
+    setTimeout(() => {
+      resultEl.innerHTML = `
+        <b>정의:</b> 확인이 필요한 안내 메시지입니다.<br><br>
+        <b>중요도:</b> 즉시 조치가 필요하지는 않지만 주의가 필요합니다.<br><br>
+        <b>행동:</b> 발신 기관 이름과 취소/처리 여부를 한 번 더 확인하세요.
+      `;
+      goBtn.textContent = "새 문장 넣기";
+      hasResult = true;
+    }, 800);
+  };
 
-      if (/(연체|미납|납부|기한|체납|독촉)/.test(t)) {
-        return [
-          "정의: 납부/기한 관련 안내(연체·미납 가능)입니다.",
-          "중요도: 기한을 넘기면 불이익(추가 비용/제한) 위험이 있습니다.",
-          "행동: ‘발신처’와 ‘납부 기한(날짜)’만 먼저 확인하세요."
-        ];
-      }
-
-      if (/(인증|보안|비밀번호|로그인|otp|2단계)/.test(lower) || /(인증|보안|비밀번호|로그인|OTP|2단계)/.test(t)) {
-        return [
-          "정의: 계정/보안(인증·로그인) 관련 안내입니다.",
-          "중요도: 피싱/도용 위험이 섞일 수 있어 조심해야 합니다.",
-          "행동: 링크는 누르지 말고, 앱/공식 사이트에서 직접 로그인해 알림이 실제인지 확인하세요."
-        ];
-      }
-
-      if (/(배송|택배|송장|반품|관세|관부가세)/.test(t)) {
-        return [
-          "정의: 배송/물류 관련 안내(배송 상태·청구 포함)입니다.",
-          "중요도: 금액 청구가 있으면 실결제 피해로 이어질 수 있습니다.",
-          "행동: ‘주문한 적이 있는지’부터 확인하고, 없다면 링크 클릭 없이 무시/차단하세요."
-        ];
-      }
-
-      if (/(계약|약관|동의|변경|해지|갱신)/.test(t)) {
-        return [
-          "정의: 계약/약관/조건 변경 관련 문장입니다.",
-          "중요도: 동의/갱신은 이후 분쟁의 핵심이 됩니다.",
-          "행동: ‘무엇이 바뀌는지(요금/기간/해지)’ 한 항목만 찾아 다시 붙여넣으세요."
-        ];
-      }
-
-      return basicFallback();
+  // 사진 선택 시 → OCR 흐름 진입 (지금은 자리만)
+  imgEl.onchange = () => {
+    if (imgEl.files.length > 0) {
+      resultEl.style.display = "block";
+      resultEl.innerHTML = "사진을 분석 중입니다…";
+      goBtn.textContent = "새 문장 넣기";
+      hasResult = true;
     }
+  };
+</script>
 
-    function render(lines) {
-      const out = document.getElementById("out");
-      document.getElementById("l1").textContent = lines[0] || "";
-      document.getElementById("l2").textContent = lines[1] || "";
-      document.getElementById("l3").textContent = lines[2] || "";
-      out.style.display = "block";
-    }
-
-    function setMode(nextMode) {
-      const btn = document.getElementById("go");
-      mode = nextMode;
-      btn.textContent = (mode === "ask") ? "바로답" : "새 문장 넣기";
-    }
-
-    function resetAll() {
-      const q = document.getElementById("q");
-      const out = document.getElementById("out");
-      q.value = "";
-      out.style.display = "none";
-      q.focus();
-      setStatus("");
-      setMode("ask");
-    }
-
-    // ===== 서버 OCR (A-1) =====
-    function readAsDataURL(file) {
-      return new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(String(r.result || ""));
-        r.onerror = reject;
-        r.readAsDataURL(file);
-      });
-    }
-
-    async function runOCR(file) {
-      setStatus("인식 중… (조금만 기다려주세요)");
-      const dataUrl = await readAsDataURL(file);
-
-      const resp = await fetch("/api/ocr", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: dataUrl })
-      });
-
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json?.error || "OCR 실패");
-      }
-      return (json.text || "").trim();
-    }
-
-    // 사진 버튼 → 파일 선택(촬영/캡처 모두)
-    document.getElementById("photo").addEventListener("click", () => {
-      document.getElementById("img").click();
-    });
-
-    document.getElementById("img").addEventListener("change", async (e) => {
-      try {
-        const file = e.target.files && e.target.files[0];
-        if (!file) return;
-
-        const text = await runOCR(file);
-        const q = document.getElementById("q");
-
-        if (!text) {
-          setStatus("글자를 읽지 못했습니다. 더 가까이, 더 밝게 찍어주세요.");
-          return;
-        }
-
-        q.value = text;
-        q.focus();
-        setMode("ask");
-        setStatus("인식 완료. 바로답을 눌러주세요.");
-      } catch (err) {
-        setStatus("인식 실패. 사진을 더 선명하게 찍어주세요.");
-      } finally {
-        document.getElementById("img").value = "";
-      }
-    });
-
-    // 기존 단일 버튼 로직
-    document.getElementById("go").addEventListener("click", () => {
-      const q = document.getElementById("q");
-
-      if (mode === "ask") {
-        const lines = classifyAndAnswer(q.value);
-        render(lines);
-        setMode("reset");
-        setStatus("");
-        return;
-      }
-      resetAll();
-    });
-
-    // Enter(Shift+Enter는 줄바꿈)
-    document.getElementById("q").addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        document.getElementById("go").click();
-      }
-    });
-  </script>
 </body>
 </html>
