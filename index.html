@@ -8,97 +8,180 @@
 
 <body style="font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; max-width:720px; margin:0 auto; padding:16px;">
 
-  <h1>바로답</h1>
-  <p>이해 안 되는 걸 보내면, 지금 할 한 가지를 바로 알려줍니다.</p>
+  <h1 style="margin:0 0 8px 0;">바로답</h1>
+  <p style="margin:0 0 14px 0;">이해 안 되는 걸 보내면, 지금 할 한 가지를 바로 알려줍니다.</p>
 
   <!-- 텍스트 입력 -->
-  <label style="font-weight:700;">문장을 그대로 붙여넣으세요</label>
-  <textarea
-    id="text"
-    rows="6"
-    placeholder="예) ‘납부 기한이 경과되었습니다’ 이게 무슨 뜻이죠?"
-    style="width:100%; margin-top:8px; padding:12px; font-size:16px; border-radius:12px; border:1px solid #ddd;"
-  ></textarea>
-
-  <!-- 사진 입력 버튼 -->
-  <div style="margin-top:12px; display:flex; gap:10px;">
-    <input
-      id="img"
-      type="file"
-      accept="image/*"
-      capture="environment"
-      style="display:none"
-    />
-    <button
-      id="photo"
-      onclick="document.getElementById('img').click()"
-      style="flex:1; padding:12px; border:1px solid #ddd; border-radius:12px; font-size:16px; font-weight:700;">
-      사진으로 바로답
-    </button>
+  <div style="margin-top:10px;">
+    <div style="font-weight:700; margin-bottom:8px;">문장을 그대로 붙여넣으세요</div>
+    <textarea
+      id="text"
+      rows="6"
+      placeholder="예) ‘납부 기한이 경과되었습니다’ 이게 무슨 뜻이죠?"
+      style="width:100%; padding:12px; font-size:16px; border-radius:12px; border:1px solid #ddd; box-sizing:border-box;"
+    ></textarea>
   </div>
 
-  <!-- 메인 실행 버튼 -->
+  <!-- 사진 입력: (1) 불러오기용 input  (2) 촬영용 input -->
+  <input id="imgPick" type="file" accept="image/*" style="display:none" />
+  <input id="imgCam" type="file" accept="image/*" capture="environment" style="display:none" />
+
+  <!-- 사진/카메라 단일 버튼 -->
+  <button
+    id="photo"
+    style="margin-top:12px; width:100%; padding:12px; border:1px solid #ddd; border-radius:12px; font-size:16px; font-weight:700; cursor:pointer; background:#f7f7f7;">
+    사진으로 바로답
+  </button>
+
+  <!-- 메인 실행 버튼 (상태 전환) -->
   <button
     id="go"
-    style="margin-top:12px; width:100%; padding:12px; border:0; border-radius:12px; font-size:16px; font-weight:700; background:#000; color:#fff;">
+    style="margin-top:12px; width:100%; padding:12px; border:0; border-radius:12px; font-size:16px; font-weight:700; cursor:pointer; background:#000; color:#fff;">
     바로답
   </button>
 
-  <!-- 결과 영역 -->
+  <!-- 결과 -->
   <div
     id="result"
-    style="margin-top:16px; padding:14px; border-radius:12px; border:1px solid #eee; display:none;"
+    style="margin-top:16px; padding:14px; border-radius:12px; border:1px solid #eee; display:none; line-height:1.55;"
   ></div>
 
 <script>
   const textEl = document.getElementById('text');
-  const imgEl = document.getElementById('img');
-  const goBtn = document.getElementById('go');
-  const resultEl = document.getElementById('result');
+  const imgPickEl = document.getElementById('imgPick');
+  const imgCamEl  = document.getElementById('imgCam');
+  const photoBtn  = document.getElementById('photo');
+  const goBtn     = document.getElementById('go');
+  const resultEl  = document.getElementById('result');
 
   let hasResult = false;
 
-  // 메인 버튼 동작
+  function showResult(html) {
+    resultEl.style.display = "block";
+    resultEl.innerHTML = html;
+  }
+
+  function setModeResult(on) {
+    hasResult = on;
+    goBtn.textContent = on ? "새 문장 넣기" : "바로답";
+  }
+
+  function resetAll() {
+    textEl.value = "";
+    imgPickEl.value = "";
+    imgCamEl.value = "";
+    resultEl.style.display = "none";
+    resultEl.innerHTML = "";
+    setModeResult(false);
+  }
+
+  // 단일 버튼: 카메라로 찍을지 / 사진(파일)에서 고를지 선택
+  photoBtn.onclick = () => {
+    // 확인 = 촬영 / 취소 = 불러오기 (iOS/시니어 UX 기준 가장 단순)
+    const useCamera = confirm("카메라로 촬영할까요?\n확인: 촬영 / 취소: 사진(파일)에서 선택");
+    if (useCamera) imgCamEl.click();
+    else imgPickEl.click();
+  };
+
+  // 파일 -> base64
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const s = reader.result || "";
+        // "data:image/...;base64,XXXX" 형태
+        const base64 = String(s).split(",")[1] || "";
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // OCR 호출 (/api/ocr.js 가 이미 있다는 전제)
+  async function runOcrFromFile(file) {
+    const base64 = await fileToBase64(file);
+    const res = await fetch("/api/ocr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageBase64: base64 })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || "OCR 실패");
+    return data?.text || "";
+  }
+
+  // 사진 선택(불러오기)
+  imgPickEl.onchange = async () => {
+    if (!imgPickEl.files || imgPickEl.files.length === 0) return;
+    const file = imgPickEl.files[0];
+
+    showResult("사진을 분석 중입니다…");
+    setModeResult(true);
+
+    try {
+      const text = await runOcrFromFile(file);
+      if (!text.trim()) {
+        showResult("<b>정의:</b> 글자를 읽지 못했습니다.<br><br><b>중요도:</b> 다시 촬영/선택이 필요합니다.<br><br><b>행동:</b> 글자가 크게 보이게, 흔들림 없이 다시 찍어주세요.");
+        return;
+      }
+      textEl.value = text; // OCR 결과를 텍스트창에 넣어 “재확인/수정” 가능하게 함
+      showResult("<b>OCR 완료:</b> 아래 텍스트가 채워졌습니다. 필요한 부분만 남기고 <b>바로답</b>을 누르세요.");
+      setModeResult(false); // 이제 사용자가 '바로답' 눌러 실행
+    } catch (e) {
+      showResult("<b>정의:</b> 사진 분석에 실패했습니다.<br><br><b>중요도:</b> 일시적 오류일 수 있습니다.<br><br><b>행동:</b> 새로고침 후 다시 시도하세요.");
+      setModeResult(true);
+    }
+  };
+
+  // 촬영
+  imgCamEl.onchange = async () => {
+    if (!imgCamEl.files || imgCamEl.files.length === 0) return;
+    const file = imgCamEl.files[0];
+
+    showResult("사진을 분석 중입니다…");
+    setModeResult(true);
+
+    try {
+      const text = await runOcrFromFile(file);
+      if (!text.trim()) {
+        showResult("<b>정의:</b> 글자를 읽지 못했습니다.<br><br><b>중요도:</b> 다시 촬영이 필요합니다.<br><br><b>행동:</b> 문서 전체가 꽉 차게 찍고, 빛반사/흔들림을 피하세요.");
+        return;
+      }
+      textEl.value = text;
+      showResult("<b>OCR 완료:</b> 아래 텍스트가 채워졌습니다. 필요한 부분만 남기고 <b>바로답</b>을 누르세요.");
+      setModeResult(false);
+    } catch (e) {
+      showResult("<b>정의:</b> 사진 분석에 실패했습니다.<br><br><b>중요도:</b> 일시적 오류일 수 있습니다.<br><br><b>행동:</b> 새로고침 후 다시 시도하세요.");
+      setModeResult(true);
+    }
+  };
+
+  // 메인 버튼: 바로답 실행 / 새 문장 넣기
   goBtn.onclick = async () => {
     if (hasResult) {
-      // 새 문장 넣기
-      textEl.value = "";
-      imgEl.value = "";
-      resultEl.style.display = "none";
-      goBtn.textContent = "바로답";
-      hasResult = false;
+      resetAll();
       return;
     }
 
     const text = textEl.value.trim();
     if (!text) {
-      alert("문장을 붙여넣거나 사진을 선택하세요.");
+      alert("문장을 붙여넣거나 사진으로 가져오세요.");
       return;
     }
 
-    resultEl.style.display = "block";
-    resultEl.innerHTML = "처리 중입니다…";
+    showResult("처리 중입니다…");
+    setModeResult(true);
 
-    // TODO: 실제 API 호출 연결
+    // TODO: 여기에서 당신의 '결론 타입 4개 강제' 로직/프롬프트가 실행되어야 합니다.
+    // 지금은 UI/흐름 안정화가 목표이므로, 결과 출력은 임시입니다.
     setTimeout(() => {
-      resultEl.innerHTML = `
-        <b>정의:</b> 확인이 필요한 안내 메시지입니다.<br><br>
-        <b>중요도:</b> 즉시 조치가 필요하지는 않지만 주의가 필요합니다.<br><br>
-        <b>행동:</b> 발신 기관 이름과 취소/처리 여부를 한 번 더 확인하세요.
-      `;
-      goBtn.textContent = "새 문장 넣기";
-      hasResult = true;
-    }, 800);
-  };
-
-  // 사진 선택 시 → OCR 흐름 진입 (지금은 자리만)
-  imgEl.onchange = () => {
-    if (imgEl.files.length > 0) {
-      resultEl.style.display = "block";
-      resultEl.innerHTML = "사진을 분석 중입니다…";
-      goBtn.textContent = "새 문장 넣기";
-      hasResult = true;
-    }
+      showResult(
+        "<b>정의:</b> 이 문장은 확인이 필요한 안내/내역입니다.<br><br>" +
+        "<b>중요도:</b> 서둘러 판단하면 손해/리스크가 생길 수 있습니다.<br><br>" +
+        "<b>행동:</b> 발신 기관/회사명과 ‘취소/결제/납부’ 중 무엇인지 한 줄만 남기고 다시 누르세요."
+      );
+    }, 600);
   };
 </script>
 
