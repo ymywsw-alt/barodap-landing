@@ -5,8 +5,113 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>바로답</title>
 </head>
-<body style="font-family: system-ui; max-width: 720px; margin: 64px auto; padding: 0 16px;">
-  <h1>바로답</h1>
-  <p>이해 안 되는 걸 보내면, 지금 할 한 가지를 바로 알려줍니다.</p>
+
+<body style="font-family: system-ui; max-width: 720px; margin: 56px auto; padding: 0 16px; line-height: 1.5;">
+  <h1 style="margin:0 0 8px 0;">바로답</h1>
+  <p style="margin:0 0 20px 0; opacity:0.8;">이해 안 되는 걸 보내면, 지금 할 한 가지를 바로 알려줍니다.</p>
+
+  <!-- 입력 -->
+  <label for="q" style="display:block; font-weight:600; margin: 16px 0 8px;">문장을 그대로 붙여넣으세요</label>
+  <textarea id="q" rows="5"
+    placeholder="예) ‘납부 기한이 경과되었습니다’ 이게 무슨 뜻이지?"
+    style="width:100%; padding:12px; border:1px solid #ddd; border-radius:10px; font-size:16px;"></textarea>
+
+  <button id="go"
+    style="margin-top:12px; width:100%; padding:12px; border:0; border-radius:12px; font-size:16px; font-weight:700; cursor:pointer;">
+    바로답
+  </button>
+
+  <!-- 결과 (3줄 고정) -->
+  <div id="out"
+    style="margin-top:18px; padding:14px; border:1px solid #eee; border-radius:12px; display:none;">
+    <div id="l1" style="font-weight:700; margin-bottom:6px;"></div>
+    <div id="l2" style="margin-bottom:6px;"></div>
+    <div id="l3"></div>
+  </div>
+
+  <script>
+    // 초기에 "쓸 수 있는 상태"를 만들기 위한 임시 판단 엔진(대표 상황 일부)
+    // 원칙: 3줄 고정(정의/중요도/행동1) + 추측 금지(애매하면 단호한 기본 답)
+    function basicFallback() {
+      return [
+        "정의: 의미가 확실하지 않은 문장입니다.",
+        "중요도: 섣불리 판단하면 손해/리스크가 생길 수 있습니다.",
+        "행동: 발신처(기관/회사) 이름과 ‘무엇을 요구하는지’만 확인해 다시 붙여넣으세요."
+      ];
+    }
+
+    function classifyAndAnswer(text) {
+      const t = (text || "").trim();
+      if (!t) {
+        return [
+          "정의: 입력이 비어 있습니다.",
+          "중요도: 판단할 정보가 없습니다.",
+          "행동: 이해 안 되는 문장을 그대로 1~2줄 붙여넣으세요."
+        ];
+      }
+
+      const lower = t.toLowerCase();
+
+      // 대표 패턴(초기용): 납부/연체/기한/미납
+      if (/(연체|미납|납부|기한|체납|독촉)/.test(t)) {
+        return [
+          "정의: 납부/기한 관련 안내(연체·미납 가능)입니다.",
+          "중요도: 기한을 넘기면 불이익(추가 비용/제한) 위험이 있습니다.",
+          "행동: ‘발신처’와 ‘납부 기한(날짜)’만 먼저 확인하세요."
+        ];
+      }
+
+      // 대표 패턴: 인증/로그인/보안/비밀번호
+      if (/(인증|보안|비밀번호|로그인|otp|2단계)/.test(lower) || /(인증|보안|비밀번호|로그인|OTP|2단계)/.test(t)) {
+        return [
+          "정의: 계정/보안(인증·로그인) 관련 안내입니다.",
+          "중요도: 피싱/도용 위험이 섞일 수 있어 조심해야 합니다.",
+          "행동: 링크는 누르지 말고, 앱/공식 사이트에서 직접 로그인해 알림이 실제인지 확인하세요."
+        ];
+      }
+
+      // 대표 패턴: 배송/택배/반품/관부가세
+      if (/(배송|택배|송장|반품|관세|관부가세)/.test(t)) {
+        return [
+          "정의: 배송/물류 관련 안내(배송 상태·청구 포함)입니다.",
+          "중요도: 금액 청구가 있으면 실결제 피해로 이어질 수 있습니다.",
+          "행동: ‘주문한 적이 있는지’부터 확인하고, 없다면 링크 클릭 없이 무시/차단하세요."
+        ];
+      }
+
+      // 대표 패턴: 계약/약관/동의/변경
+      if (/(계약|약관|동의|변경|해지|갱신)/.test(t)) {
+        return [
+          "정의: 계약/약관/조건 변경 관련 문장입니다.",
+          "중요도: 동의/갱신은 이후 분쟁의 핵심이 됩니다.",
+          "행동: ‘무엇이 바뀌는지(요금/기간/해지)’ 한 항목만 찾아 다시 붙여넣으세요."
+        ];
+      }
+
+      return basicFallback();
+    }
+
+    function render(lines) {
+      const out = document.getElementById("out");
+      document.getElementById("l1").textContent = lines[0] || "";
+      document.getElementById("l2").textContent = lines[1] || "";
+      document.getElementById("l3").textContent = lines[2] || "";
+      out.style.display = "block";
+    }
+
+    document.getElementById("go").addEventListener("click", () => {
+      const text = document.getElementById("q").value;
+      const lines = classifyAndAnswer(text);
+      render(lines);
+    });
+
+    // Enter(Shift+Enter는 줄바꿈)
+    document.getElementById("q").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById("go").click();
+      }
+    });
+  </script>
 </body>
 </html>
