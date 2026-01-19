@@ -17,18 +17,21 @@
 
   <!-- 사진/캡처 업로드(버튼 1개로 통합) -->
   <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
-    <input id="img" type="file" accept="image/*" style="display:none" />
-    <button id="photo"
-      style="flex:1; padding:12px; border:1px solid #ddd; border-radius:12px; font-size:16px; font-weight:700; cursor:pointer;">
-      사진으로 바로답
-    </button>
-  </div>
+  <input
+    id="img"
+    type="file"
+    accept="image/*"
+    capture="environment"
+    style="display:none"
+  />
 
-  <!-- 단일 버튼(바로답 ↔ 새 문장 넣기) -->
-  <button id="go"
-    style="margin-top:12px; width:100%; padding:12px; border:0; border-radius:12px; font-size:16px; font-weight:700; cursor:pointer;">
-    바로답
+  <button
+    id="photo"
+    onclick="document.getElementById('img').click()"
+    style="flex:1; padding:12px; border:1px solid #ddd; border-radius:12px; font-size:16px; font-weight:700; cursor:pointer;">
+    사진으로 바로답
   </button>
+</div>
 
   <!-- 결과 (3줄 고정) -->
   <div id="out"
