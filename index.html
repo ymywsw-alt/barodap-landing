@@ -10,13 +10,21 @@
   <h1 style="margin:0 0 8px 0;">바로답</h1>
   <p style="margin:0 0 20px 0; opacity:0.8;">이해 안 되는 걸 보내면, 지금 할 한 가지를 바로 알려줍니다.</p>
 
-  <!-- 입력 -->
   <label for="q" style="display:block; font-weight:600; margin: 16px 0 8px;">문장을 그대로 붙여넣으세요</label>
   <textarea id="q" rows="5"
     placeholder="예) ‘납부 기한이 경과되었습니다’ 이게 무슨 뜻이지?"
     style="width:100%; padding:12px; border:1px solid #ddd; border-radius:10px; font-size:16px;"></textarea>
 
-  <!-- 단일 버튼(상태 전환) -->
+  <!-- 사진/캡처 업로드(버튼 1개로 통합) -->
+  <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
+    <input id="img" type="file" accept="image/*" style="display:none" />
+    <button id="photo"
+      style="flex:1; padding:12px; border:1px solid #ddd; border-radius:12px; font-size:16px; font-weight:700; cursor:pointer;">
+      사진으로 바로답
+    </button>
+  </div>
+
+  <!-- 단일 버튼(바로답 ↔ 새 문장 넣기) -->
   <button id="go"
     style="margin-top:12px; width:100%; padding:12px; border:0; border-radius:12px; font-size:16px; font-weight:700; cursor:pointer;">
     바로답
@@ -30,9 +38,14 @@
     <div id="l3"></div>
   </div>
 
+  <div id="status" style="margin-top:10px; font-size:14px; opacity:0.8;"></div>
+
   <script>
-    // 상태: "ask" = 바로답, "reset" = 새 문장 넣기
-    let mode = "ask";
+    let mode = "ask"; // ask=바로답, reset=새 문장 넣기
+
+    function setStatus(msg) {
+      document.getElementById("status").textContent = msg || "";
+    }
 
     function basicFallback() {
       return [
@@ -109,25 +122,81 @@
       q.value = "";
       out.style.display = "none";
       q.focus();
+      setStatus("");
       setMode("ask");
     }
 
+    // ===== 서버 OCR (A-1) =====
+    function readAsDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result || ""));
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+    }
+
+    async function runOCR(file) {
+      setStatus("인식 중… (조금만 기다려주세요)");
+      const dataUrl = await readAsDataURL(file);
+
+      const resp = await fetch("/api/ocr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: dataUrl })
+      });
+
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json?.error || "OCR 실패");
+      }
+      return (json.text || "").trim();
+    }
+
+    // 사진 버튼 → 파일 선택(촬영/캡처 모두)
+    document.getElementById("photo").addEventListener("click", () => {
+      document.getElementById("img").click();
+    });
+
+    document.getElementById("img").addEventListener("change", async (e) => {
+      try {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        const text = await runOCR(file);
+        const q = document.getElementById("q");
+
+        if (!text) {
+          setStatus("글자를 읽지 못했습니다. 더 가까이, 더 밝게 찍어주세요.");
+          return;
+        }
+
+        q.value = text;
+        q.focus();
+        setMode("ask");
+        setStatus("인식 완료. 바로답을 눌러주세요.");
+      } catch (err) {
+        setStatus("인식 실패. 사진을 더 선명하게 찍어주세요.");
+      } finally {
+        document.getElementById("img").value = "";
+      }
+    });
+
+    // 기존 단일 버튼 로직
     document.getElementById("go").addEventListener("click", () => {
       const q = document.getElementById("q");
 
       if (mode === "ask") {
         const lines = classifyAndAnswer(q.value);
         render(lines);
-        // 결과를 보여준 뒤, 버튼을 "새 문장 넣기"로 전환
         setMode("reset");
+        setStatus("");
         return;
       }
-
-      // mode === "reset"
       resetAll();
     });
 
-    // Enter(Shift+Enter는 줄바꿈). 결과 후 Enter를 누르면 reset되도록 통일
+    // Enter(Shift+Enter는 줄바꿈)
     document.getElementById("q").addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
