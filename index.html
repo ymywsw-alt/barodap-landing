@@ -16,6 +16,7 @@
     placeholder="예) ‘납부 기한이 경과되었습니다’ 이게 무슨 뜻이지?"
     style="width:100%; padding:12px; border:1px solid #ddd; border-radius:10px; font-size:16px;"></textarea>
 
+  <!-- 단일 버튼(상태 전환) -->
   <button id="go"
     style="margin-top:12px; width:100%; padding:12px; border:0; border-radius:12px; font-size:16px; font-weight:700; cursor:pointer;">
     바로답
@@ -30,8 +31,9 @@
   </div>
 
   <script>
-    // 초기에 "쓸 수 있는 상태"를 만들기 위한 임시 판단 엔진(대표 상황 일부)
-    // 원칙: 3줄 고정(정의/중요도/행동1) + 추측 금지(애매하면 단호한 기본 답)
+    // 상태: "ask" = 바로답, "reset" = 새 문장 넣기
+    let mode = "ask";
+
     function basicFallback() {
       return [
         "정의: 의미가 확실하지 않은 문장입니다.",
@@ -52,7 +54,6 @@
 
       const lower = t.toLowerCase();
 
-      // 대표 패턴(초기용): 납부/연체/기한/미납
       if (/(연체|미납|납부|기한|체납|독촉)/.test(t)) {
         return [
           "정의: 납부/기한 관련 안내(연체·미납 가능)입니다.",
@@ -61,7 +62,6 @@
         ];
       }
 
-      // 대표 패턴: 인증/로그인/보안/비밀번호
       if (/(인증|보안|비밀번호|로그인|otp|2단계)/.test(lower) || /(인증|보안|비밀번호|로그인|OTP|2단계)/.test(t)) {
         return [
           "정의: 계정/보안(인증·로그인) 관련 안내입니다.",
@@ -70,7 +70,6 @@
         ];
       }
 
-      // 대표 패턴: 배송/택배/반품/관부가세
       if (/(배송|택배|송장|반품|관세|관부가세)/.test(t)) {
         return [
           "정의: 배송/물류 관련 안내(배송 상태·청구 포함)입니다.",
@@ -79,7 +78,6 @@
         ];
       }
 
-      // 대표 패턴: 계약/약관/동의/변경
       if (/(계약|약관|동의|변경|해지|갱신)/.test(t)) {
         return [
           "정의: 계약/약관/조건 변경 관련 문장입니다.",
@@ -99,13 +97,37 @@
       out.style.display = "block";
     }
 
+    function setMode(nextMode) {
+      const btn = document.getElementById("go");
+      mode = nextMode;
+      btn.textContent = (mode === "ask") ? "바로답" : "새 문장 넣기";
+    }
+
+    function resetAll() {
+      const q = document.getElementById("q");
+      const out = document.getElementById("out");
+      q.value = "";
+      out.style.display = "none";
+      q.focus();
+      setMode("ask");
+    }
+
     document.getElementById("go").addEventListener("click", () => {
-      const text = document.getElementById("q").value;
-      const lines = classifyAndAnswer(text);
-      render(lines);
+      const q = document.getElementById("q");
+
+      if (mode === "ask") {
+        const lines = classifyAndAnswer(q.value);
+        render(lines);
+        // 결과를 보여준 뒤, 버튼을 "새 문장 넣기"로 전환
+        setMode("reset");
+        return;
+      }
+
+      // mode === "reset"
+      resetAll();
     });
 
-    // Enter(Shift+Enter는 줄바꿈)
+    // Enter(Shift+Enter는 줄바꿈). 결과 후 Enter를 누르면 reset되도록 통일
     document.getElementById("q").addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
